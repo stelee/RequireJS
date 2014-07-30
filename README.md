@@ -28,19 +28,60 @@ var myFunc=require('path/mylib').myFunc;
 mylib();//will print the string "my lib is running"
 ```
 
-Also, you can inject the other javascript by using:
+Also, you can simply include the other javascript by using:
 ```
-injection('path/jquery.js');
+require('path/jquery.js');
 ```
+
+**New feture**
+I finally make it support dependencies injection.
+
+    injector.register("logger",function(message){
+		return message;
+	});
+	injector.register("context",{
+		foo: function(){return "bar"}
+	});
+	injector.register("outer","outer_dep");
+
+	injector.process('logger','context','outer','auto_outer',
+		function(logger,context,outer,autoOuter){
+			assert.ok(logger("hello")==="hello","function injection works");
+			assert.ok(context.foo()==="bar","object injection works");
+			assert.ok(outer.echo() === "bart","outer injection works");
+			assert.ok(autoOuter.echo() === "bart","auto outer injection works");
+		}
+	);
+	
+For those who like to mock the object for testing, I have the *createNewInjector* function to support.
+
+    var anotherInjector=newInjector();
+	anotherInjector.cloneDeps(injector); //clone the dependencies if you like
+	anotherInjector.register("logger",function(message){ //change some function, here you can use your mock object
+		return "echo:"+message;
+	})
+	anotherInjector.process('logger',function(logger){
+		assert.ok(logger("hello")==="echo:hello","another injection/function update: function injection works");
+	})
+
+For more details, please check the QUnit included.
+
 
 How to config it
 ------------
-There is the configuration object in the code, named as _webnpm.confg_, you can config the following:
+There is the configuration object in the code, named as _config_, you can config the following:
 
 * contentResolver : normally, this is not suggested to change. It will use _ajaxGet_ function to get the data from another javascript file.
 * pathResolver: this is used to get the real path of the javascript. By default, the path of the javascript must be in the same domain of your web app due to the security limitation
 * async: by default this is set to false. So you can use the code like ```var func=require('path/lib').fun```. Or else you need to set the callback to handle the js library.
-* alias_*: is the name registered for the global
+* alias.*: is the name registered for the global
+
+How to test it
+------------
+In this version, I have included the test. In the node envrionment, you can just run the
+
+    node server
+and check the test result from http://localhost:9002/index.html
 
 Enjoy it
 ---------

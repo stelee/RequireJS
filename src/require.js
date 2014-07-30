@@ -1,5 +1,5 @@
 //require.js
-//version 2.1.0
+//version 2.1.2
 (function(scope){
 	'use strict'
 
@@ -9,8 +9,9 @@
 		async:false,
 		alias: {
 			require : "require",
-			injection: "injection",
-			mix: "mix_traits"
+			mix: "mixin",
+			injector: "injector",
+			newInjector: "newInjector"
 		}
 	}
 
@@ -143,26 +144,78 @@
 		
 	}
 
-	var injection=function(path,callback){
-		if("function"==typeof(callback)){
-			contentResolver(path,function(content){
-				callback(eval(content));
-			})
-		}else{
-			var content=contentResolver(path);
-			return eval(content);
-		}
-	}
-
 	var mix=function(targetClass, traits){
-		for(prop in traits){
+		for(var prop in traits){
 			targetClass.prototype[prop]=traits[prop];
 		}
 	}
+	//injector
+	var Injector=function()
+	{
+		this.deps={};
+	}
 
-	//register alias
+	Injector.prototype={
+		register : function(name, content)
+		{
+			switch(typeof content)
+			{
+				case "function":
+					this.deps[name]=content;
+					break;
+				case "object":
+					this.deps[name]=content;
+					break;
+				case "string" : //content is the path name of dep
+					this.deps[name]=require(content);
+					break;
+				default:
+					//do nothing
+			}
+		},
+		process: function()
+		{
+			var that=this;
+			var argumentsLength=arguments.length;
+			var args=[];
+			for(var i=0;i<argumentsLength;i++){
+				args.push(arguments[i]);
+			}
+			var toInjects=args
+							.slice(0,argumentsLength-1)
+							.map(function(injectName){
+								var toInject=that.deps[injectName];
+								if(typeof toInject === 'undefined' 
+									|| toInject === null)
+								{
+									toInject=require(injectName);
+								}
+								return toInject;
+							})
+			var fn=args[argumentsLength-1];
+			var fnScope=scope;
+			if(typeof fn === 'object')
+			{
+				fnScope=fn['scope'];
+				fn=fn['fn'];
+			}
+			fn.apply(fnScope,toInjects);
+		},
+		cloneDeps: function(anotherInjector)
+		{
+			for(var key in anotherInjector.deps)
+			{
+				this.deps[key]=anotherInjector.deps[key];
+			}
+		}
+	}
+
+	var injector=new Injector();
 	
 	scope[config.alias.require]=require;
-	scope[config.alias.injection]=injection;
 	scope[config.alias.mix]=mix;
+	scope[config.alias.injector]=injector;
+	scope[config.alias.newInjector]=function(){
+		return new Injector();
+	}
 })(this);
